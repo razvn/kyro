@@ -12,6 +12,7 @@ import { flatOnSuccess } from '@/utils/result';
 import { map, sortBy } from 'lodash';
 import { computed, onActivated, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute } from 'vue-router';
 
 const { t } = useI18n();
 
@@ -20,6 +21,7 @@ const {
   result,
   execute: loadApplications,
   loading,
+  reset: resetApplications,
 } = usePaginatedApiCall((page: number) =>
   applicationApi
     .getAll({
@@ -52,7 +54,19 @@ const {
     ),
 );
 
-onActivated(loadApplications);
+const route = useRoute();
+const forceReloadApplications = () => {
+  resetApplications();
+  loadApplications();
+};
+
+onActivated(forceReloadApplications);
+watch(
+  () => route.query.refresh,
+  () => {
+    forceReloadApplications();
+  },
+);
 
 const organizationFilter = ref<CFOrganization['guid']>();
 const organizations = computed(() => sortBy(applications.value?.included?.organizations, (item) => item.name));
@@ -158,7 +172,7 @@ const { data: paginatedApplications, pagination } = usePagination(filteredApplic
           </v-col>
 
           <v-col cols="auto">
-            <v-btn variant="text" @click="loadApplications" size="large">
+            <v-btn variant="text" @click="forceReloadApplications" size="large">
               <v-icon>mdi-cached</v-icon>
             </v-btn>
           </v-col>

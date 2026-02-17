@@ -67,7 +67,7 @@ const closeSectionDrawer = () => {
   }
 };
 const handleDeleteSuccess = () => {
-  router.push({ name: RouteNames.APPLICATIONS });
+  router.push({ name: RouteNames.APPLICATIONS, query: { refresh: `${Date.now()}` } });
 };
 
 const loadAllData = async (reset: boolean = false) => {

@@ -21,12 +21,20 @@ const emits = defineEmits<{
 const loading = ref(false);
 const dialog = ref(false);
 const isDisabled = computed(() => props.disabled || loading.value);
+const wait = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
 
 const { fn: confirmDelete } = useLoadingFn(async () => {
   emits('launched');
 
   const result = await applicationApi.delete(props.application.guid);
   if (result.success) {
+    for (let i = 0; i < 20; i++) {
+      const appResult = await applicationApi.getOne(props.application.guid);
+      if (!appResult.success) {
+        break;
+      }
+      await wait(1000);
+    }
     dialog.value = false;
     emits('success');
   } else {
