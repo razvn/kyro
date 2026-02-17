@@ -2,7 +2,7 @@
 import { LocaleKey, availableLocales, localeOptions } from '@/core/i18n';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { VMenu } from 'vuetify/lib/components/index.mjs';
+import { VMenu } from 'vuetify/components';
 
 defineProps<{
   location?: VMenu['location'];

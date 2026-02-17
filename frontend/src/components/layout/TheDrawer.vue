@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { RouteLocationRaw, useRouter } from 'vue-router';
-import { useDisplay } from 'vuetify/lib/framework.mjs';
+import { useDisplay } from 'vuetify';
 
 type MenuItem = {
   label: string;

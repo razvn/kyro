@@ -12,7 +12,7 @@ type UseFormReturn<TObj extends object, TSchema = any> = {
   schema: TSchema;
   input: UnwrapNestedRefs<Partial<TObj>>;
   rulesFor: <TField extends keyof TObj>(field: TField) => ValidationRule[];
-  validate: () => z.SafeParseReturnType<Partial<TObj>, TObj>;
+  validate: () => z.ZodSafeParseResult<TObj>;
   isValid: ComputedRef<boolean>;
 };
 
@@ -23,7 +23,7 @@ export const useForm = <TObj extends object>(
   const schema = z.object(shape);
   const input = reactive<Partial<TObj>>(initialValue ?? {});
 
-  const validate = () => schema.safeParse(input) as z.SafeParseReturnType<Partial<TObj>, TObj>;
+  const validate = () => schema.safeParse(input) as z.ZodSafeParseResult<TObj>;
 
   return {
     schema,
