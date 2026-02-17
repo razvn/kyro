@@ -16,6 +16,7 @@ import { CFInclude } from '@/models/cf/common';
 import { waitUntil } from '@/utils/common';
 import { matchesOneOf } from '@/utils/string';
 import { computed, onDeactivated, ref } from 'vue';
+import { useDisplay } from 'vuetify';
 
 const props = defineProps<{
   guid: CFApplication['guid'];
@@ -54,6 +55,14 @@ const polling = computed({
     }
   },
 });
+
+const display = useDisplay();
+const showSectionDrawer = ref(false);
+const closeSectionDrawer = () => {
+  if (display.mdAndDown.value) {
+    showSectionDrawer.value = false;
+  }
+};
 
 const loadAllData = async (reset: boolean = false) => {
   if (reset) {
@@ -127,6 +136,13 @@ const restaging = computed(() => !!refRestageButton.value?.loading);
     <v-card v-if="application" flat>
       <v-toolbar density="compact">
         <v-toolbar-title class="v-col-auto">
+          <v-btn
+            v-if="display.mdAndDown.value"
+            icon="mdi-menu"
+            variant="text"
+            class="me-2"
+            @click="showSectionDrawer = true">
+          </v-btn>
           {{ application.name }}
         </v-toolbar-title>
 
@@ -186,26 +202,38 @@ const restaging = computed(() => !!refRestageButton.value?.loading);
         </v-checkbox-btn>
       </v-toolbar>
 
-      <v-navigation-drawer order="2">
+      <v-navigation-drawer
+        order="2"
+        :model-value="display.lgAndUp.value ? true : showSectionDrawer"
+        :permanent="display.lgAndUp.value"
+        :temporary="display.mdAndDown.value"
+        @update:model-value="showSectionDrawer = $event">
         <v-list density="compact">
           <v-list-item
             title="Application"
             :to="{ name: RouteNames.APPLICATION, params: { guid: application.guid } }"
-            exact>
+            exact
+            @click="closeSectionDrawer">
           </v-list-item>
           <v-list-item
             title="Environnement"
-            :to="{ name: RouteNames.APPLICATION_ENVIRONMENT, params: { guid: application.guid } }">
+            :to="{ name: RouteNames.APPLICATION_ENVIRONMENT, params: { guid: application.guid } }"
+            @click="closeSectionDrawer">
           </v-list-item>
-          <v-list-item title="Routes" :to="{ name: RouteNames.APPLICATION_ROUTES, params: { guid: application.guid } }">
+          <v-list-item
+            title="Routes"
+            :to="{ name: RouteNames.APPLICATION_ROUTES, params: { guid: application.guid } }"
+            @click="closeSectionDrawer">
           </v-list-item>
           <v-list-item
             title="Services"
-            :to="{ name: RouteNames.APPLICATION_SERVICES, params: { guid: application.guid } }">
+            :to="{ name: RouteNames.APPLICATION_SERVICES, params: { guid: application.guid } }"
+            @click="closeSectionDrawer">
           </v-list-item>
           <v-list-item
             title="Log Stream"
-            :to="{ name: RouteNames.APPLICATION_LOG_STREAM, params: { guid: application.guid } }">
+            :to="{ name: RouteNames.APPLICATION_LOG_STREAM, params: { guid: application.guid } }"
+            @click="closeSectionDrawer">
           </v-list-item>
         </v-list>
       </v-navigation-drawer>
