@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ApiErrorResponse } from '@/api';
+import { ApiErrorResponse, buildApiErrorResponse } from '@/api';
 import serviceApi from '@/api/service';
 import ServiceCardDetails from '@/components/services/ServiceCardDetails.vue';
 import ServiceCardItem from '@/components/services/ServiceCardItem.vue';
@@ -77,7 +77,11 @@ const { data: filteredServices, filters } = useFilterData((filters, { includesTe
 const dialog = ref<DialogState>({ opened: false, service: undefined });
 const deleting = ref(false);
 const deletingBindingGuid = ref<ServiceWithBinding['binding']['guid']>();
-const deleteDialog = ref<{ opened: boolean; service?: ServiceWithBinding }>({ opened: false, service: undefined });
+const deleteDialog = ref<{ opened: boolean; service?: ServiceWithBinding; deleteInstance: boolean }>({
+  opened: false,
+  service: undefined,
+  deleteInstance: false,
+});
 
 const wait = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
 const waitForBindingDeletion = async (bindingGuid: ServiceWithBinding['binding']['guid']) => {
@@ -88,6 +92,22 @@ const waitForBindingDeletion = async (bindingGuid: ServiceWithBinding['binding']
     }
 
     const exists = result.data.resources.some((binding) => binding.guid === bindingGuid);
+    if (!exists) {
+      return;
+    }
+
+    await wait(1000);
+  }
+};
+
+const waitForServiceInstanceDeletion = async (serviceGuid: ServiceWithBinding['guid']) => {
+  for (let i = 0; i < 20; i++) {
+    const result = await serviceApi.getInstances([serviceGuid]);
+    if (!result.success) {
+      break;
+    }
+
+    const exists = result.data.resources.some((service) => service.guid === serviceGuid);
     if (!exists) {
       return;
     }
@@ -113,7 +133,7 @@ const openService = async (service: ServiceWithBinding) => {
 };
 
 const requestDeleteService = (service: ServiceWithBinding) => {
-  deleteDialog.value = { opened: true, service };
+  deleteDialog.value = { opened: true, service, deleteInstance: false };
 };
 
 const { fn: confirmDeleteService } = useLoadingFn(async () => {
@@ -124,7 +144,31 @@ const { fn: confirmDeleteService } = useLoadingFn(async () => {
   const result = await serviceApi.deleteBinding(service.binding.guid);
   if (result.success) {
     await waitForBindingDeletion(service.binding.guid);
-    deleteDialog.value = { opened: false, service: undefined };
+
+    if (deleteDialog.value.deleteInstance) {
+      const bindingsResult = await serviceApi.getBindingsForInstance(service.guid);
+      if (bindingsResult.success) {
+        if (bindingsResult.data.resources.length === 0) {
+          const deleteInstanceResult = await serviceApi.deleteInstance(service.guid);
+          if (deleteInstanceResult.success) {
+            await waitForServiceInstanceDeletion(service.guid);
+          } else {
+            context.errors.value.push(deleteInstanceResult.error as ApiErrorResponse);
+          }
+        } else {
+          context.errors.value.push(
+            buildApiErrorResponse({
+              title: 'Service instance still in use',
+              detail: `The service instance is still bound (${bindingsResult.data.resources.length} binding(s) remaining) and cannot be deleted.`,
+            }),
+          );
+        }
+      } else {
+        context.errors.value.push(bindingsResult.error as ApiErrorResponse);
+      }
+    }
+
+    deleteDialog.value = { opened: false, service: undefined, deleteInstance: false };
     loadData();
   } else {
     context.errors.value.push(result.error as ApiErrorResponse);
@@ -143,8 +187,17 @@ const { fn: confirmDeleteService } = useLoadingFn(async () => {
 
       <confirm-dialog v-model="deleteDialog.opened" @confirm="confirmDeleteService" :loading="deleting">
         <template #text>
-          Delete service `{{ deleteDialog.service?.name }}` from application `{{ context.application.value.name }}`?
-          This removes the binding from this app.
+          <div>
+            Delete service `{{ deleteDialog.service?.name }}` from application `{{ context.application.value.name }}`?
+            This removes the binding from this app.
+          </div>
+          <v-checkbox
+            v-model="deleteDialog.deleteInstance"
+            class="mt-2"
+            color="warning"
+            hide-details
+            label="Also delete service instance after unbind">
+          </v-checkbox>
         </template>
       </confirm-dialog>
 
