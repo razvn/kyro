@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { CFServiceInstance } from '@/models/cf/service';
+import { ServiceWithBinding } from '@/components/services/models';
 import { formatDate } from '@/utils/date';
 import { computed } from 'vue';
 
 const props = defineProps<{
-  service: CFServiceInstance;
+  service: ServiceWithBinding;
+  deleting?: boolean;
+}>();
+
+const emits = defineEmits<{
+  (e: 'open'): void;
+  (e: 'delete'): void;
 }>();
 
 const progressColor = computed(() => {
@@ -22,7 +28,7 @@ const progressColor = computed(() => {
 </script>
 
 <template>
-  <v-card density="compact">
+  <v-card density="compact" @click="emits('open')">
     <v-progress-linear
       :color="progressColor"
       model-value="100"
@@ -47,5 +53,18 @@ const progressColor = computed(() => {
         <v-col cols="auto">{{ formatDate(service.updated_at, 'DD/MM/YYYY HH:mm:ss') }}</v-col>
       </v-row>
     </v-card-text>
+
+    <v-card-actions class="justify-end">
+      <v-btn
+        color="warning"
+        variant="text"
+        size="small"
+        :loading="deleting"
+        :disabled="deleting"
+        @click.stop="emits('delete')">
+        <v-icon>mdi-delete-outline</v-icon>
+        <v-tooltip activator="parent" location="bottom">Delete service from app</v-tooltip>
+      </v-btn>
+    </v-card-actions>
   </v-card>
 </template>

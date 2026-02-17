@@ -33,4 +33,11 @@ export default {
       authorization: useAuthStore().getAuthorization,
     });
   },
+  deleteBinding: async (guid: CFServiceBinding['guid']) => {
+    return await handleApiCall({
+      path: `/v3/service_credential_bindings/${guid}`,
+      method: 'DELETE',
+      authorization: useAuthStore().getAuthorization,
+    });
+  },
 };

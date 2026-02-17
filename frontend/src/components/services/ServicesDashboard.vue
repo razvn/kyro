@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { ApiErrorResponse } from '@/api';
 import serviceApi from '@/api/service';
 import ServiceCardDetails from '@/components/services/ServiceCardDetails.vue';
 import ServiceCardItem from '@/components/services/ServiceCardItem.vue';
+import ConfirmDialog from '@/components/shared/ConfirmDialog.vue';
 import { ServiceDetails, ServiceWithBinding } from '@/components/services/models';
 import useApiCall from '@/composables/useApiCall';
 import useApplicationContext from '@/composables/useApplicationContext';
 import useFilterData from '@/composables/useFilterData';
+import useLoadingFn from '@/composables/useLoadingFn';
 import { mapResources } from '@/models/cf/common';
 import { onSuccess, successOf } from '@/utils/result';
 import { ref } from 'vue';
@@ -72,6 +75,27 @@ const { data: filteredServices, filters } = useFilterData((filters, { includesTe
 });
 
 const dialog = ref<DialogState>({ opened: false, service: undefined });
+const deleting = ref(false);
+const deletingBindingGuid = ref<ServiceWithBinding['binding']['guid']>();
+const deleteDialog = ref<{ opened: boolean; service?: ServiceWithBinding }>({ opened: false, service: undefined });
+
+const wait = (delayMs: number) => new Promise((resolve) => setTimeout(resolve, delayMs));
+const waitForBindingDeletion = async (bindingGuid: ServiceWithBinding['binding']['guid']) => {
+  for (let i = 0; i < 20; i++) {
+    const result = await serviceApi.getBindingsForApplication(context.guid.value);
+    if (!result.success) {
+      break;
+    }
+
+    const exists = result.data.resources.some((binding) => binding.guid === bindingGuid);
+    if (!exists) {
+      return;
+    }
+
+    await wait(1000);
+  }
+};
+
 const openService = async (service: ServiceWithBinding) => {
   context.loading.value = true;
 
@@ -87,6 +111,27 @@ const openService = async (service: ServiceWithBinding) => {
 
   context.loading.value = false;
 };
+
+const requestDeleteService = (service: ServiceWithBinding) => {
+  deleteDialog.value = { opened: true, service };
+};
+
+const { fn: confirmDeleteService } = useLoadingFn(async () => {
+  const service = deleteDialog.value.service;
+  if (!service) return;
+
+  deletingBindingGuid.value = service.binding.guid;
+  const result = await serviceApi.deleteBinding(service.binding.guid);
+  if (result.success) {
+    await waitForBindingDeletion(service.binding.guid);
+    deleteDialog.value = { opened: false, service: undefined };
+    loadData();
+  } else {
+    context.errors.value.push(result.error as ApiErrorResponse);
+  }
+
+  deletingBindingGuid.value = undefined;
+}, deleting);
 </script>
 
 <template>
@@ -95,6 +140,13 @@ const openService = async (service: ServiceWithBinding) => {
       <v-dialog v-model="dialog.opened" width="80%" scrollable>
         <service-card-details v-if="dialog.service" :service="dialog.service"></service-card-details>
       </v-dialog>
+
+      <confirm-dialog v-model="deleteDialog.opened" @confirm="confirmDeleteService" :loading="deleting">
+        <template #text>
+          Delete service `{{ deleteDialog.service?.name }}` from application `{{ context.application.value.name }}`?
+          This removes the binding from this app.
+        </template>
+      </confirm-dialog>
 
       <v-row justify="end">
         <v-col cols="3">
@@ -112,7 +164,12 @@ const openService = async (service: ServiceWithBinding) => {
 
       <v-row>
         <v-col cols="3" v-for="service in filteredServices" :key="`application-${service.guid}`">
-          <service-card-item :service="service" @click="openService(service)"></service-card-item>
+          <service-card-item
+            :service="service"
+            :deleting="deletingBindingGuid === service.binding.guid"
+            @open="openService(service)"
+            @delete="requestDeleteService(service)">
+          </service-card-item>
         </v-col>
       </v-row>
     </v-col>
